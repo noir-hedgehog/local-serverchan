@@ -1,0 +1,59 @@
+{
+  "name": "wecom-scheduled-webhook-server",
+  "version": "0.1.0",
+  "description": "Cross-platform scheduled WeCom webhook message sender.",
+  "author": "Uriah",
+  "private": true,
+  "type": "module",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "electron:dev": "electron .",
+    "pack": "electron-builder --dir",
+    "pack:local": "electron-builder --dir -c.electronDist=./node_modules/electron/dist -c.electronVersion=36.9.5",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win nsis --x64",
+    "dist:win:dir": "electron-builder --win --x64 --dir",
+    "check": "node --check src/app.js && node --check src/server.js && node --check src/wecom.js && node --check src/store.js && node --check src/scheduler.js && node --check electron/main.cjs"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "multer": "^2.0.0",
+    "node-cron": "^4.0.7"
+  },
+  "devDependencies": {
+    "electron": "^36.2.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.wecom.scheduledpush",
+    "productName": "企业微信定时消息推送",
+    "files": [
+      "electron/**/*",
+      "src/**/*",
+      "public/**/*",
+      "package.json",
+      "node_modules/**/*"
+    ],
+    "asar": true,
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Utility"
+    }
+  }
+}

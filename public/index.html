@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>企业微信定时消息推送</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <h1>企业微信定时消息推送</h1>
+        <p>配置 webhook、消息类型和 cron 定时规则，服务端按计划发送到企微群。</p>
+      </div>
+      <button id="refreshBtn" class="ghost" type="button">刷新</button>
+    </header>
+
+    <main class="shell">
+      <section class="panel settings-panel">
+        <div class="panel-title">
+          <h2>Webhook 配置</h2>
+          <span id="statusPill" class="pill">未连接</span>
+        </div>
+        <form id="settingsForm" class="grid-form">
+          <label>
+            <span>Webhook 名称</span>
+            <input id="webhookName" placeholder="例如：测试群">
+          </label>
+          <label>
+            <span>Webhook URL</span>
+            <input id="webhookUrl" type="url" placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=...">
+          </label>
+          <label class="button-field">
+            <span>&nbsp;</span>
+            <button id="addWebhookBtn" class="primary" type="button">添加 Webhook</button>
+          </label>
+          <label>
+            <span>时区</span>
+            <select id="timezone" name="timezone">
+              <option value="Asia/Shanghai">Asia/Shanghai</option>
+              <option value="Asia/Tokyo">Asia/Tokyo</option>
+              <option value="Asia/Singapore">Asia/Singapore</option>
+              <option value="UTC">UTC</option>
+              <option value="America/Los_Angeles">America/Los_Angeles</option>
+              <option value="America/New_York">America/New_York</option>
+              <option value="Europe/London">Europe/London</option>
+              <option value="Europe/Berlin">Europe/Berlin</option>
+            </select>
+          </label>
+          <div id="webhooksList" class="webhooks-list wide"></div>
+        </form>
+      </section>
+
+      <section class="workspace">
+        <form id="composerForm" class="panel composer">
+          <div class="panel-title">
+            <h2>消息与定时</h2>
+            <div class="actions">
+              <button id="previewBtn" class="ghost" type="button">预览 JSON</button>
+              <button id="sendNowBtn" class="primary" type="button">立即发送</button>
+              <button id="saveJobBtn" class="primary" type="submit">保存任务</button>
+            </div>
+          </div>
+
+          <input id="editingJobId" type="hidden">
+
+          <div class="grid-form">
+            <label>
+              <span>任务名称</span>
+              <input id="jobName" required placeholder="例如：每日晨报">
+            </label>
+            <label>
+              <span>任务 webhook</span>
+              <select id="jobWebhookId"></select>
+            </label>
+            <label>
+              <span>启用任务</span>
+              <select id="enabled">
+                <option value="true">启用</option>
+                <option value="false">暂停</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="subsection-title">
+            <h3>消息列表</h3>
+            <button id="addMessageBtn" class="ghost" type="button">添加消息</button>
+          </div>
+          <div id="messagesList" class="message-fields"></div>
+
+          <div class="schedule-grid">
+            <label>
+              <span>定时模式</span>
+              <select id="scheduleMode">
+                <option value="once">只发送一次</option>
+                <option value="daily">每天</option>
+                <option value="weekly">每周</option>
+                <option value="interval">每隔 N 分钟</option>
+                <option value="custom">自定义 cron</option>
+              </select>
+            </label>
+            <label data-schedule="start">
+              <span>开始时间</span>
+              <input id="startAt" type="datetime-local">
+            </label>
+            <label data-schedule="end">
+              <span>结束时间</span>
+              <input id="endAt" type="datetime-local">
+            </label>
+            <label data-schedule="time">
+              <span>时间</span>
+              <input id="scheduleTime" type="time" value="09:00">
+            </label>
+            <fieldset id="weekdayGroup" class="weekday-group" data-schedule="weekday" hidden>
+              <legend>星期</legend>
+              <label><input type="checkbox" value="1" checked>周一</label>
+              <label><input type="checkbox" value="2">周二</label>
+              <label><input type="checkbox" value="3">周三</label>
+              <label><input type="checkbox" value="4">周四</label>
+              <label><input type="checkbox" value="5">周五</label>
+              <label><input type="checkbox" value="6">周六</label>
+              <label><input type="checkbox" value="0">周日</label>
+            </fieldset>
+            <label data-schedule="interval" hidden>
+              <span>间隔分钟</span>
+              <input id="intervalMinutes" type="number" min="1" max="1440" value="60">
+            </label>
+            <label class="wide" data-schedule="cron">
+              <span>Cron</span>
+              <input id="cronExpr" required value="0 9 * * *">
+            </label>
+            <div id="nextRuns" class="next-runs wide"></div>
+          </div>
+        </form>
+
+        <aside class="side">
+          <section class="panel">
+            <div class="panel-title">
+              <h2>任务</h2>
+              <button id="newJobBtn" class="ghost" type="button">新建</button>
+            </div>
+            <div id="jobsList" class="list empty">暂无任务</div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-title">
+              <h2>发送日志</h2>
+              <button id="clearPreviewBtn" class="ghost" type="button">清空预览</button>
+            </div>
+            <div id="logsList" class="list empty">暂无日志</div>
+          </section>
+        </aside>
+      </section>
+
+      <details class="panel preview-panel" open>
+        <summary class="panel-title">
+          <h2>Payload 预览</h2>
+          <span class="pill">企微 JSON</span>
+        </summary>
+        <pre id="payloadPreview">{}</pre>
+      </details>
+    </main>
+
+    <template id="jobItemTemplate">
+      <article class="list-item">
+        <div>
+          <strong data-name></strong>
+          <p data-meta></p>
+          <p data-schedule-meta></p>
+          <p data-error class="error-text" hidden></p>
+        </div>
+        <div class="row-actions">
+          <button data-run type="button">发送</button>
+          <button data-edit type="button">编辑</button>
+          <button data-toggle-enabled type="button">暂停</button>
+          <button data-delete class="danger" type="button">删除</button>
+        </div>
+      </article>
+    </template>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>
