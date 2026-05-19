@@ -14,14 +14,29 @@ async function startBackend() {
   if (httpServer) return serviceUrl;
   const appRoot = electronApp.getAppPath();
   const dataDir = path.join(electronApp.getPath('userData'), 'data');
+  const logDir = path.join(electronApp.getPath('userData'), 'logs');
   const { createApp } = await import(pathToFileURL(path.join(appRoot, 'src', 'app.js')).href);
-  const { app } = await createApp({ rootDir: appRoot, dataDir });
+  const { createRuntimeLogger } = await import(pathToFileURL(path.join(appRoot, 'src', 'runtime-log.js')).href);
+  const logger = createRuntimeLogger({ logDir, service: 'wecom-scheduled-webhook-electron' });
+  const startedAt = new Date().toISOString();
+  const runtime = {
+    mode: 'electron',
+    startedAt
+  };
+  const { app } = await createApp({
+    rootDir: appRoot,
+    dataDir,
+    logger,
+    runtime
+  });
 
   httpServer = await new Promise((resolve) => {
     const server = app.listen(0, '127.0.0.1', () => resolve(server));
   });
   const { port } = httpServer.address();
+  runtime.port = port;
   serviceUrl = `http://127.0.0.1:${port}/`;
+  logger.info('server-listening', { url: serviceUrl, port });
   return serviceUrl;
 }
 

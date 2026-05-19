@@ -36,6 +36,35 @@ http://localhost:3077
 
 数据保存在 `data/store.json`，该目录已加入 `.gitignore`，避免 webhook 被提交。
 
+## 后台状态和日志
+
+健康检查：
+
+```bash
+curl http://localhost:3077/api/health
+```
+
+浏览器版运行日志写入 `logs/server.log`，每行一条 JSON，包含启动、监听、退出信号、异常和请求错误。标准输出写入 `logs/stdout.log`，标准错误写入 `logs/stderr.log`。
+
+当前 macOS 本机已配置用户级 `launchd` 服务：
+
+```bash
+launchctl print gui/$(id -u)/com.noir-hedgehog.local-serverchan
+```
+
+停止服务：
+
+```bash
+launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.noir-hedgehog.local-serverchan.plist
+```
+
+重新启动：
+
+```bash
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.noir-hedgehog.local-serverchan.plist
+launchctl kickstart -k gui/$(id -u)/com.noir-hedgehog.local-serverchan
+```
+
 ## Electron 桌面应用
 
 开发启动：

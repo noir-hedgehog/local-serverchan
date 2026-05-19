@@ -4,6 +4,7 @@ import path from 'node:path';
 import express from 'express';
 import multer from 'multer';
 
+import { serializeError } from './runtime-log.js';
 import { normalizeSchedule, scheduleToCron, Scheduler } from './scheduler.js';
 import { createId, JsonStore, publicJob } from './store.js';
 import {
@@ -16,15 +17,24 @@ import {
   summarizePayload
 } from './wecom.js';
 
-export async function createApp({ rootDir, dataDir }) {
+export async function createApp({ rootDir, dataDir, logger = null, runtime = {} }) {
+  const startedAt = runtime.startedAt || new Date().toISOString();
   const uploadDir = path.join(dataDir, 'uploads');
-  const store = new JsonStore(path.join(dataDir, 'store.json'));
+  const storePath = path.join(dataDir, 'store.json');
+  const store = new JsonStore(storePath);
 
   await mkdir(uploadDir, { recursive: true });
   await store.load();
 
   const scheduler = new Scheduler(store);
   scheduler.start();
+  logger?.info('app-ready', {
+    mode: runtime.mode || 'server',
+    rootDir,
+    dataDir,
+    storePath,
+    enabledJobs: store.snapshot().jobs.filter((job) => job.enabled).length
+  });
 
   const app = express();
   const upload = multer({
@@ -40,6 +50,26 @@ export async function createApp({ rootDir, dataDir }) {
   app.use(express.json({ limit: '30mb' }));
   app.use(express.urlencoded({ extended: true, limit: '30mb' }));
   app.use(express.static(path.join(rootDir, 'public')));
+
+  app.get('/api/health', (req, res) => {
+    const state = store.snapshot();
+    res.json({
+      ok: true,
+      pid: process.pid,
+      mode: runtime.mode || 'server',
+      startedAt,
+      uptimeSeconds: Math.round((Date.now() - Date.parse(startedAt)) / 1000),
+      port: runtime.port || null,
+      dataDir,
+      storePath,
+      logPath: logger?.filePath || '',
+      jobs: {
+        total: state.jobs.length,
+        enabled: state.jobs.filter((job) => job.enabled).length
+      },
+      lastLogAt: state.logs?.[0]?.at || ''
+    });
+  });
 
   app.get('/api/state', (req, res) => {
     const state = store.snapshot();
@@ -183,6 +213,11 @@ export async function createApp({ rootDir, dataDir }) {
   });
 
   app.use((error, req, res, next) => {
+    logger?.error('request-error', {
+      method: req.method,
+      path: req.path,
+      ...serializeError(error)
+    });
     res.status(400).json({ error: error.message || '请求失败' });
   });
 
